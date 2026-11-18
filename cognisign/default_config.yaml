@@ -1,0 +1,45 @@
+# CogniSign configuration
+# Copy to ~/.cognisign/config.yaml with `cognisign init` and edit freely.
+
+camera:
+  index: 0            # which webcam
+  width: 1280
+  height: 720
+  mirror: true        # show yourself like a mirror
+
+tracking:
+  num_hands: 1
+  min_detection_confidence: 0.6
+  min_tracking_confidence: 0.5
+
+recognition:
+  hold_ms: 600        # how long a gesture must be held before it fires
+  cooldown_ms: 700    # minimum gap between any two actions
+  min_confidence: 0.6 # for your own recorded gestures
+  k: 5
+  max_distance: 1.2   # reject poses further than this from every recording
+  use_presets: true   # built-in gestures (open_palm, thumbs_up, ...)
+
+voice:
+  rate: 170
+  voice: null         # null = system default
+
+# gesture name -> what it does
+# action types: speak, type, hotkey, phrase_add, phrase_speak,
+#               phrase_undo, phrase_clear, toggle_pause, none
+gestures:
+  thumbs_up:   { action: speak, value: "Yes" }
+  thumbs_down: { action: speak, value: "No" }
+  open_palm:   { action: speak, value: "Hello" }
+  peace:       { action: speak, value: "Thank you" }
+  ok:          { action: speak, value: "I'm okay" }
+  call_me:     { action: speak, value: "I need help, please" }
+  point:       { action: phrase_undo }
+  three:       { action: phrase_clear }
+  fist:        { action: phrase_speak }
+  rock:        { action: toggle_pause }
+
+  # Your own gestures, after `cognisign record water` etc:
+  # water:  { action: phrase_add, value: "water" }
+  # please: { action: phrase_add, value: "please" }
+  # next_slide: { action: hotkey, value: "right" }
