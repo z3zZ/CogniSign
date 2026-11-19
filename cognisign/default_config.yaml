@@ -26,14 +26,19 @@ voice:
 
 # gesture name -> what it does
 # action types: speak, type, hotkey, phrase_add, phrase_speak,
-#               phrase_undo, phrase_clear, toggle_pause, none
+#               phrase_undo, phrase_clear, toggle_pause, toggle_mode, none
+#
+# Two modes (switch with the OK sign by default):
+#   quick     speak gestures say their words straight away
+#   sentence  speak gestures ADD their words to a sentence instead;
+#             fist speaks the whole sentence
 gestures:
   thumbs_up:   { action: speak, value: "Yes" }
   thumbs_down: { action: speak, value: "No" }
   open_palm:   { action: speak, value: "Hello" }
   peace:       { action: speak, value: "Thank you" }
-  ok:          { action: speak, value: "I'm okay" }
   call_me:     { action: speak, value: "I need help, please" }
+  ok:          { action: toggle_mode }
   point:       { action: phrase_undo }
   three:       { action: phrase_clear }
   fist:        { action: phrase_speak }

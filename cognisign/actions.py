@@ -26,6 +26,7 @@ ACTION_TYPES = {
     "phrase_undo": "Remove the last word from the sentence",
     "phrase_clear": "Clear the sentence",
     "toggle_pause": "Pause / resume all other gestures",
+    "toggle_mode": "Switch between quick replies and sentence building",
     "none": "Do nothing (useful for a 'rest' pose)",
 }
 NEEDS_VALUE = {"speak", "type", "hotkey", "phrase_add"}
@@ -142,66 +143,115 @@ class PynputKeyboard:
             self._kb.release(k)
 
 
+MODES = ("quick", "sentence")
+
+
 @dataclass
 class DispatchResult:
-    action: Action
-    output: str = ""
+    action: Action          # the action that actually ran (after mode translation)
+    output: str = ""        # machine-friendly result, e.g. the spoken text
+    message: str = ""       # what to show the person on screen
+    kind: str = "info"      # said | added | info | warn
 
 
 class ActionDispatcher:
+    """Runs actions and reports back in words a person can read at a glance.
+
+    Two modes:
+      quick     gestures do exactly what they're mapped to ("Yes", "No", ...)
+      sentence  gestures mapped to `speak` add their words to the sentence
+                instead, so the same vocabulary builds full sentences
+    """
+
     def __init__(self, speaker: Speaker | None = None, keyboard: Keyboard | None = None,
                  phrase: PhraseBuffer | None = None):
         self.speaker = speaker or ConsoleSpeaker()
         self.keyboard = keyboard or NullKeyboard()
         self.phrase = phrase or PhraseBuffer()
         self.paused = False
+        self.mode = "quick"
+
+    def effective(self, action: Action | None) -> Action | None:
+        """The action as it will run in the current mode."""
+        if action is not None and self.mode == "sentence" and action.type == "speak":
+            return Action("phrase_add", action.value)
+        return action
+
+    def describe(self, action: Action | None) -> str:
+        """Short label for the bindings panel."""
+        a = self.effective(action)
+        if a is None:
+            return "(not set)"
+        return {
+            "speak": f'say "{a.value}"',
+            "type": f'type "{a.value}"',
+            "hotkey": f"press {a.value}",
+            "phrase_add": f'add "{a.value}"',
+            "phrase_speak": "speak sentence",
+            "phrase_undo": "undo last word",
+            "phrase_clear": "clear sentence",
+            "toggle_pause": "pause / resume",
+            "toggle_mode": "quick <-> sentence",
+            "none": "nothing",
+        }[a.type]
 
     def dispatch(self, action: Action | None) -> DispatchResult | None:
+        action = self.effective(action)
         if action is None:
             return None
         if self.paused and action.type != "toggle_pause":
             return None
         handler = getattr(self, f"_do_{action.type}")
-        out = handler(action.value) or ""
+        out, message, kind = handler(action.value)
         log.info("gesture action %s -> %s", action.describe(), out)
-        return DispatchResult(action, out)
+        return DispatchResult(action, out, message, kind)
 
-    def _do_speak(self, value: str) -> str:
+    def _do_speak(self, value: str):
         self.speaker.say(value)
-        return value
+        return value, f"Said: {value}", "said"
 
-    def _do_type(self, value: str) -> str:
+    def _do_type(self, value: str):
         self.keyboard.type_text(value)
-        return value
+        return value, f"Typed: {value}", "info"
 
-    def _do_hotkey(self, value: str) -> str:
+    def _do_hotkey(self, value: str):
         self.keyboard.hotkey(value)
-        return value
+        return value, f"Pressed: {value}", "info"
 
-    def _do_phrase_add(self, value: str) -> str:
+    def _do_phrase_add(self, value: str):
         self.phrase.add(value)
-        return self.phrase.text
+        return self.phrase.text, f"Added: {value}", "added"
 
-    def _do_phrase_speak(self, _value: str) -> str:
+    def _do_phrase_speak(self, _value: str):
         text = self.phrase.take()
-        if text:
-            self.speaker.say(text)
-        return text
+        if not text:
+            return "", "Sentence is empty, nothing to say", "warn"
+        self.speaker.say(text)
+        return text, f"Said: {text}", "said"
 
-    def _do_phrase_undo(self, _value: str) -> str:
-        self.phrase.undo()
-        return self.phrase.text
+    def _do_phrase_undo(self, _value: str):
+        word = self.phrase.undo()
+        if word is None:
+            return "", "Sentence is already empty", "warn"
+        return self.phrase.text, f"Removed: {word}", "info"
 
-    def _do_phrase_clear(self, _value: str) -> str:
+    def _do_phrase_clear(self, _value: str):
+        had = len(self.phrase)
         self.phrase.clear()
-        return ""
+        return "", "Sentence cleared" if had else "Sentence is already empty", "info"
 
-    def _do_toggle_pause(self, _value: str) -> str:
+    def _do_toggle_pause(self, _value: str):
         self.paused = not self.paused
-        return "paused" if self.paused else "resumed"
+        return ("paused", "Paused", "warn") if self.paused else ("resumed", "Resumed", "info")
 
-    def _do_none(self, _value: str) -> str:
-        return ""
+    def _do_toggle_mode(self, _value: str):
+        self.mode = "sentence" if self.mode == "quick" else "quick"
+        if self.mode == "sentence":
+            return self.mode, "Sentence mode: gestures now add words", "info"
+        return self.mode, "Quick mode: gestures speak straight away", "info"
+
+    def _do_none(self, _value: str):
+        return "", "", "info"
 
     def close(self) -> None:
         self.speaker.close()

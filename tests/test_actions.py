@@ -83,3 +83,30 @@ def test_phrase_buffer_limits_and_punctuation():
     p.clear()
     p.add("are you okay?")
     assert p.text == "Are you okay?"
+
+
+def test_sentence_mode_turns_speak_into_add(d):
+    d.dispatch(Action("toggle_mode"))
+    res = d.dispatch(Action("speak", "Yes"))
+    assert res.action.type == "phrase_add" and res.message == "Added: Yes"
+    assert d.speaker.said == [] and d.phrase.words == ["Yes"]
+    assert d.describe(Action("speak", "No")) == 'add "No"'
+    d.dispatch(Action("toggle_mode"))
+    assert d.describe(Action("speak", "No")) == 'say "No"'
+
+
+@pytest.mark.parametrize("action, message, kind", [
+    (Action("speak", "Hi"), "Said: Hi", "said"),
+    (Action("phrase_add", "water"), "Added: water", "added"),
+    (Action("phrase_speak"), "Sentence is empty, nothing to say", "warn"),
+    (Action("phrase_undo"), "Sentence is already empty", "warn"),
+    (Action("hotkey", "right"), "Pressed: right", "info"),
+])
+def test_every_action_reports_a_message(d, action, message, kind):
+    res = d.dispatch(action)
+    assert (res.message, res.kind) == (message, kind)
+
+
+def test_undo_reports_removed_word(d):
+    d.dispatch(Action("phrase_add", "water"))
+    assert d.dispatch(Action("phrase_undo")).message == "Removed: water"
