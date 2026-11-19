@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from cognisign.actions import ActionDispatcher
+from cognisign.actions import Action, ActionDispatcher
 from cognisign.app import GestureEngine, run
 from cognisign.classifier import GestureLibrary
 from cognisign.cli import main
@@ -71,21 +71,93 @@ def test_build_and_speak_a_sentence(engine):
 
 
 def test_pause_gesture_suppresses_others(engine):
-    t = 0
-    for name in ["rock"] * 30 + [None] * 3 + ["thumbs_up"] * 30:
-        engine.step([hand(name)] if name else [], t)
-        t += 33
+    run_script(engine, ["rock"] * 30 + [None] * 3 + ["thumbs_up"] * 30)
     assert engine.dispatcher.speaker.said == []
     assert engine.hud.paused
 
 
-def test_hud_draws_without_error():
-    frame = np.zeros((480, 640, 3), np.uint8)
-    state = HudState(label="thumbs_up", source="preset", confidence=1.0,
-                     progress=0.6, phrase="Can I have water.", last_output="Yes")
-    out = draw(frame, [hand("open_palm", offset=(0.5, 0.7), scale=0.15)], state)
-    assert out.shape == (480, 640, 3) and out.any()
-    draw(frame, [], HudState(paused=True))
+def test_hud_draws_every_element_without_error():
+    for w, h in [(640, 480), (1280, 720), (320, 240)]:
+        frame = np.zeros((h, w, 3), np.uint8)
+        state = HudState(label="thumbs_up", source="preset", confidence=1.0, progress=0.6,
+                         mode="sentence", phrase_words=["can", "I", "have", "water"] * 8,
+                         toast="Added: water", toast_kind="added", toast_alpha=0.7, flash=1.0,
+                         bindings=[("thumbs_up", 'add "Yes"'), ("fist", "speak sentence")] * 6,
+                         fired_label="thumbs_up")
+        out = draw(frame, [hand("open_palm", offset=(0.5, 0.7), scale=0.15)], state)
+        assert out.shape == (h, w, 3) and out.any()
+        draw(frame, [], HudState(paused=True, empty_hint="Make the ok sign", show_bindings=False))
+
+
+def run_script(eng, script):
+    """Feed one pose per ~30fps frame, continuing from the engine's current clock."""
+    t = eng._now + 33
+    for name in script:
+        eng.step([hand(name)] if name else [], t)
+        t += 33
+
+
+def test_default_flow_builds_a_sentence_with_mode_switch(engine):
+    # ok -> sentence mode, thumbs up adds "Yes", peace adds "Thank you", fist speaks
+    run_script(engine, ["ok"] * 30 + [None] * 5 + ["thumbs_up"] * 30 + [None] * 5
+               + ["peace"] * 30 + [None] * 5)
+    assert engine.hud.mode == "sentence"
+    assert engine.hud.phrase_words == ["Yes", "Thank you"]
+    assert engine.dispatcher.speaker.said == []
+    run_script(engine, ["fist"] * 30)
+    assert engine.dispatcher.speaker.said == ["Yes Thank you."]
+
+
+def test_every_action_shows_a_toast_and_flash(engine):
+    run_script(engine, ["thumbs_up"] * 25)
+    assert engine.hud.toast == "Said: Yes" and engine.hud.flash == 1.0
+    assert engine.hud.fired_label == "thumbs_up"
+    run_script(engine, [None] * 5 + ["fist"] * 25)
+    assert engine.hud.toast == "Sentence is empty, nothing to say"
+    assert engine.hud.toast_kind == "warn"
+
+
+def test_toast_fades_out(engine):
+    run_script(engine, ["thumbs_up"] * 25)
+    assert engine.hud.toast_alpha == 1.0
+    run_script(engine, [None] * 80)  # ~2.6 s later
+    assert engine.hud.toast_alpha == 0.0 and engine.hud.flash == 0.0
+
+
+def test_unbound_custom_gesture_warns_instead_of_silence():
+    lib = GestureLibrary()
+    for _ in range(10):
+        lib.add_landmarks("wave", pose("open_palm"))
+    cfg = load_config("/nonexistent/config.yaml")
+    eng = GestureEngine(cfg, ActionDispatcher(FakeSpeaker(), FakeKeyboard()), lib)
+    run_script(eng, ["open_palm"] * 25)
+    assert "isn't bound" in eng.hud.toast
+    assert ("wave", "(not set)") in eng.hud.bindings
+
+
+def test_bindings_reflect_current_mode(engine):
+    engine.step([], 0)
+    rows = dict(engine.hud.bindings)
+    assert rows["thumbs_up"] == 'say "Yes"' and rows["ok"] == "quick <-> sentence"
+    assert list(rows)[0] == "open_palm"  # presets listed in a stable order
+    engine.manual(Action("toggle_mode"))
+    assert dict(engine.hud.bindings)["thumbs_up"] == 'add "Yes"'
+    assert engine.hud.toast.startswith("Sentence mode")
+
+
+def test_empty_hint_tells_you_how_to_start(engine):
+    engine.step([], 0)
+    assert engine.hud.empty_hint == "Make the ok sign to start building a sentence"
+    engine.manual(Action("toggle_mode"))
+    assert "fist to speak it" in engine.hud.empty_hint
+
+
+def test_keyboard_shortcuts_give_feedback(engine):
+    engine.step([], 0)
+    engine.manual(Action("toggle_pause"))
+    assert engine.hud.paused and engine.hud.toast == "Paused"
+    engine.toggle_bindings()
+    assert engine.hud.show_bindings is False
 
 
 def test_sample_collector_spacing_and_countdown():
