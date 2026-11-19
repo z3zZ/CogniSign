@@ -58,6 +58,14 @@ disarmed --(pose changes)--> re-armed
 
 `grace_ms` (150 ms) absorbs single-frame tracking dropouts so the hold ring doesn't reset.
 
+## Modes and feedback
+
+`ActionDispatcher.effective()` translates actions for the current mode (in sentence mode a
+`speak` becomes a `phrase_add`). The same translation feeds `describe()`, so the bindings
+panel always shows what a gesture will actually do. Every dispatch returns a human-readable
+`message` and a `kind` (said / added / info / warn) that the engine turns into a toast and a
+border flash.
+
 ## Threads
 
 Text-to-speech engines block while speaking, so `Pyttsx3Speaker` owns its engine on a

@@ -9,7 +9,7 @@ It's an open-source communication aid for people who can't speak, or can't speak
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
 ![MediaPipe](https://img.shields.io/badge/Google-MediaPipe-0097A7?logo=google&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-126%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-140%20passing-brightgreen)
 ![Offline](https://img.shields.io/badge/runs-100%25%20offline-black)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
@@ -28,7 +28,8 @@ Hands are faster than menus. CogniSign watches your hand through any webcam and,
 you hold a gesture, speaks for you.
 
 - **Hold thumbs up and it says "Yes".** Hold thumbs down for "No". Peace sign for "Thank you".
-- **Chain gestures into full sentences** ("Can I have some water, please.") and speak them in one go.
+- **Switch to sentence mode** and the same gestures add words instead of speaking, so you can
+  build a full sentence on screen and speak it in one go.
 - **Teach it your own gestures in about five seconds**, so it works with the hand movements *you*
   can make, not just textbook signs.
 - **Everything runs locally.** No video, landmarks or speech ever leave your computer.
@@ -41,7 +42,8 @@ you hold a gesture, speaks for you.
 | **10 gestures out of the box** | Rule-based presets work on first launch with zero setup. |
 | **Personal gestures** | Record your own; a distance-gated k-nearest-neighbour model learns them instantly, with no training step. |
 | **Deliberate, not accidental** | Gestures must be held (600 ms by default) with a visible progress ring, fire once, and won't repeat until you change pose. |
-| **Sentence builder** | AAC-style word chaining with undo, clear and speak. |
+| **Quick and sentence modes** | Quick mode speaks straight away. Sentence mode turns the same gestures into words you chain together, with undo, clear and speak. |
+| **Always know what happened** | A live bindings panel shows what every gesture does in the current mode; every action pops a toast ("Said: Yes", "Added: water") and flashes the screen edge. |
 | **Offline voice** | Text-to-speech through your OS voices (SAPI5 / NSSpeechSynthesizer / eSpeak). |
 | **Beyond speech** | Gestures can also type text or press shortcuts: control slides, media or any app hands-free. |
 | **Pause gesture** | One gesture freezes everything so normal hand movement doesn't trigger anything. |
@@ -63,22 +65,34 @@ cognisign            # start
 
 Or just run `start.bat` (Windows) / `./start.sh` (macOS, Linux), which does all of the above.
 
-**In the window:** hold a gesture until the ring fills. `q` quits, `p` pauses, `c` clears the sentence.
+**In the window:** hold a gesture until the ring fills. The panel on the right shows what every
+gesture does right now, and a toast confirms each action.
+
+| Key | |
+|---|---|
+| `q` / `Esc` | quit |
+| `m` | switch quick / sentence mode |
+| `p` | pause / resume |
+| `c` | clear the sentence |
+| `b` | show / hide the gestures panel |
 
 ## Default gestures
 
-| Gesture | | Does |
-|---|---|---|
-| Thumbs up | 👍 | says "Yes" |
-| Thumbs down | 👎 | says "No" |
-| Open palm | ✋ | says "Hello" |
-| Peace | ✌️ | says "Thank you" |
-| OK | 👌 | says "I'm okay" |
-| Call me | 🤙 | says "I need help, please" |
-| Point | ☝️ | removes the last word from the sentence |
-| Three fingers | | clears the sentence |
-| Fist | ✊ | speaks the sentence |
-| Rock | 🤘 | pauses / resumes CogniSign |
+| Gesture | | Quick mode | Sentence mode |
+|---|---|---|---|
+| Thumbs up | 👍 | says "Yes" | adds "Yes" |
+| Thumbs down | 👎 | says "No" | adds "No" |
+| Open palm | ✋ | says "Hello" | adds "Hello" |
+| Peace | ✌️ | says "Thank you" | adds "Thank you" |
+| Call me | 🤙 | says "I need help, please" | adds it |
+| OK | 👌 | switch to sentence mode | switch to quick mode |
+| Fist | ✊ | | **speaks the sentence** |
+| Point | ☝️ | | removes the last word |
+| Three fingers | | | clears the sentence |
+| Rock | 🤘 | pause / resume | pause / resume |
+
+**Building a sentence:** 👌 to enter sentence mode → show your word gestures (each one appears in
+the bar at the bottom) → ✊ to speak it all. Record your own word gestures to grow the vocabulary.
 
 All of these can be changed.
 
@@ -104,7 +118,8 @@ Recorded gestures take priority over the presets, so you can even redefine what 
 looks like for your hand. `cognisign forget water` deletes one.
 
 **Action types:** `speak`, `type`, `hotkey`, `phrase_add`, `phrase_speak`, `phrase_undo`,
-`phrase_clear`, `toggle_pause`, `none`.
+`phrase_clear`, `toggle_mode`, `toggle_pause`, `none`. In sentence mode, every `speak` gesture
+adds its words to the sentence instead.
 
 ## How it works
 
@@ -117,7 +132,7 @@ flowchart LR
     D -->|no match| E[Built-in presets<br/>finger geometry]
     E --> F
     F --> G[Action<br/>speak · type · hotkey · sentence]
-    F --> H[HUD<br/>skeleton · hold ring · sentence]
+    F --> H[HUD<br/>hold ring · bindings · sentence · toasts]
 ```
 
 1. **Tracking.** MediaPipe's Hand Landmarker finds the hand and returns 21 landmarks. Coordinates
@@ -161,7 +176,7 @@ MediaPipe model file once. Recorded gestures are stored as landmark numbers in
 
 ```bash
 pip install -e ".[dev]"
-pytest          # 126 tests; synthetic hands, no camera needed
+pytest          # 140 tests; synthetic hands, no camera needed
 ruff check .
 ```
 

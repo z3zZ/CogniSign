@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.1.0 (November 2026)
+
+Feedback from the first real-webcam session: building a sentence wasn't discoverable and
+it wasn't obvious when a gesture had fired.
+
+- Quick and sentence modes: in sentence mode, every `speak` gesture adds its words instead,
+  so the default vocabulary can build sentences out of the box (OK sign switches modes)
+- Live gestures panel showing what each gesture does in the current mode, with the held
+  gesture's progress and the fired gesture highlighted (`b` to toggle)
+- Toast for every action ("Said: Yes", "Added: water", "Sentence is empty") plus a coloured
+  border flash
+- Sentence bar shows words as they're added, highlights the newest, and explains how to start
+  when empty
+- Unbound recorded gestures now say so instead of doing nothing silently
+- Keyboard shortcuts (`m`, `p`, `c`) go through the same action path and give the same feedback
+
 ## 1.0.0 (November 2026)
 
 Ground-up rebuild of the original prototype as a finished tool.
